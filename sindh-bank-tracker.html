@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sindh Bank Deployment Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+
+/* Layout: one column ledger — summary strip, then two owner groups (Bank dependencies, iTS deliverables) as rows */
+:root{
+  --bg:#f5f7f6; --surface:#ffffff; --ink:#15211d; --muted:#5d6b66; --line:#dbe2df;
+  --accent:#0f6b4f; --accent-soft:#e2f0ea;
+  --ok:#1f7a47; --ok-soft:#e1f2e7; --warn:#a15c00; --warn-soft:#fbefdc; --risk:#b3261e; --risk-soft:#fbe4e2; --idle:#6a7772; --idle-soft:#edf1ef;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1513; --surface:#161e1b; --ink:#e4ece8; --muted:#97a6a0; --line:#2a3531;
+  --accent:#4fc59a; --accent-soft:#16302a;
+  --ok:#5fd18f; --ok-soft:#173022; --warn:#f0b35a; --warn-soft:#352812; --risk:#ff8a80; --risk-soft:#3a1a18; --idle:#a3b0ab; --idle-soft:#212b28;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1513; --surface:#161e1b; --ink:#e4ece8; --muted:#97a6a0; --line:#2a3531;
+  --accent:#4fc59a; --accent-soft:#16302a;
+  --ok:#5fd18f; --ok-soft:#173022; --warn:#f0b35a; --warn-soft:#352812; --risk:#ff8a80; --risk-soft:#3a1a18; --idle:#a3b0ab; --idle-soft:#212b28;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-direction:column;gap:6px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font-size:clamp(24px,4vw,32px);font-weight:700;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0;max-width:65ch}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.stat .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat .v{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--idle-soft);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:3px}
+section{display:flex;flex-direction:column;gap:10px}
+.sechead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:6px}
+h2{margin:0;font-size:17px;font-weight:600}
+.sechead .note{font-size:13px;color:var(--muted)}
+.rows{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:44px minmax(0,1fr) 150px 150px;gap:14px;padding:14px 16px;border-top:1px solid var(--line);align-items:start}
+.row:first-child{border-top:0}
+.id{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:3px}
+.main{min-width:0;display:flex;flex-direction:column;gap:6px}
+.title{font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{font-size:11.5px;font-family:var(--mono);padding:1px 7px;border-radius:4px;background:var(--accent-soft);color:var(--accent)}
+.dep{font-size:12.5px;color:var(--muted)}
+.dep.blocked{color:var(--risk)}
+.notes{width:100%;box-sizing:border-box;font:inherit;font-size:13.5px;color:var(--ink);background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 6px;margin-left:-6px}
+.notes::placeholder{color:var(--muted)}
+.notes:hover{border-color:var(--line)}
+.notes:focus{outline:none;border:1px solid var(--accent);background:var(--bg)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+select,input[type=date]{font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 8px;width:100%;box-sizing:border-box}
+input[type=date]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select.s-done{background:var(--ok-soft);color:var(--ok);border-color:transparent;font-weight:600}
+select.s-progress{background:var(--warn-soft);color:var(--warn);border-color:transparent;font-weight:600}
+select.s-blocked{background:var(--risk-soft);color:var(--risk);border-color:transparent;font-weight:600}
+select.s-pending{background:var(--idle-soft);color:var(--idle);border-color:transparent;font-weight:600}
+.overdue{color:var(--risk);font-size:12px;font-weight:600}
+.savebar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--ink);color:var(--bg);border-radius:10px;padding:12px 16px;margin-bottom:env(safe-area-inset-bottom,0px)}
+.savebar button{font:inherit;font-weight:600;border:0;border-radius:6px;padding:7px 14px;cursor:pointer;background:var(--accent);color:var(--surface)}
+.savebar button.ghost{background:transparent;color:var(--bg);border:1px solid currentColor}
+.savebar .acts{display:flex;gap:8px}
+.foot{font-size:12.5px;color:var(--muted)}
+.ro{font-size:13px;color:var(--muted);background:var(--idle-soft);border-radius:8px;padding:8px 12px}
+
+.notetext{font-size:13.5px;color:var(--muted)}
+.pill{display:inline-block;align-self:flex-start;font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px}
+.pill.s-done{background:var(--ok-soft);color:var(--ok)}
+.pill.s-progress{background:var(--warn-soft);color:var(--warn)}
+.pill.s-blocked{background:var(--risk-soft);color:var(--risk)}
+.pill.s-pending{background:var(--idle-soft);color:var(--idle)}
+.date{font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums}
+@media (max-width:680px){
+  .row{grid-template-columns:36px minmax(0,1fr);}
+  .row .field{grid-column:2}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<!-- Tracker data. To update by hand: change "status" (pending, progress, blocked, done), "due" (YYYY-MM-DD) or "notes".
+     Or open this page with #edit at the end of the URL, edit on screen, and click "Download updated file". -->
+<script type="application/json" id="state">{"updated":"2026-10-28","items":[
+{"id":"SB-1","group":"bank","title":"Server credentials for on-prem WhatsApp deployment","stream":"WhatsApp","status":"pending","due":"","notes":"","deps":[]},
+{"id":"SB-2","group":"bank","title":"Letters to PTA for short code","stream":"SMS","status":"pending","due":"","notes":"","deps":[]},
+{"id":"IT-1","group":"its","title":"WhatsApp onboarding","stream":"WhatsApp","status":"pending","due":"","notes":"","deps":[]},
+{"id":"IT-2","group":"its","title":"WhatsApp on-prem deployment","stream":"WhatsApp","status":"pending","due":"","notes":"","deps":["SB-1","IT-1"]},
+{"id":"IT-3","group":"its","title":"SMS integration","stream":"SMS","status":"pending","due":"","notes":"","deps":["SB-2"]},
+{"id":"IT-4","group":"its","title":"Go live and training","stream":"WhatsApp + SMS","status":"pending","due":"","notes":"","deps":["IT-2","IT-3"]}
+]}</script>
+<div class="wrap" id="root"></div>
+<script id="app">
+(function(){
+  var STATUS={pending:"Not started",progress:"In progress",blocked:"Blocked",done:"Done"};
+  var saved=JSON.parse(document.getElementById("state").textContent);
+  var state=JSON.parse(JSON.stringify(saved));
+  var editing=location.hash==="#edit";
+  var root=document.getElementById("root");
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function byId(id){return state.items.find(function(i){return i.id===id;});}
+  function dirty(){return JSON.stringify(state.items)!==JSON.stringify(saved.items);}
+  function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+  function fmt(d){if(!d)return"";var p=d.split("-");var m=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return p[2]+" "+m[+p[1]-1]+" "+p[0];}
+  function row(it){
+    var open=it.deps.filter(function(d){var x=byId(d);return x&&x.status!=="done";});
+    var depTxt="";
+    if(it.deps.length){depTxt=open.length?'<span class="dep blocked">Waiting on '+open.map(function(d){return esc(d)+" "+esc(byId(d).title.split(" for ")[0]);}).join(", ")+'</span>':'<span class="dep">Dependencies cleared</span>';}
+    var late=it.due&&it.status!=="done"&&it.due<today();
+    if(!editing){
+      return '<div class="row"><div class="id">'+esc(it.id)+'</div>'+
+        '<div class="main"><div class="title">'+esc(it.title)+'</div><div class="meta"><span class="tag">'+esc(it.stream)+'</span>'+depTxt+'</div>'+
+        (it.notes?'<div class="notetext">'+esc(it.notes)+'</div>':'')+'</div>'+
+        '<div class="field"><label>Status</label><span class="pill s-'+it.status+'">'+STATUS[it.status]+'</span></div>'+
+        '<div class="field"><label>Target date</label><span class="date">'+(it.due?fmt(it.due):"Not set")+'</span>'+(late?'<span class="overdue">Overdue</span>':'')+'</div></div>';
+    }
+    var opts=Object.keys(STATUS).map(function(k){return'<option value="'+k+'"'+(k===it.status?" selected":"")+'>'+STATUS[k]+'</option>';}).join("");
+    return '<div class="row"><div class="id">'+esc(it.id)+'</div>'+
+      '<div class="main"><div class="title">'+esc(it.title)+'</div>'+
+      '<div class="meta"><span class="tag">'+esc(it.stream)+'</span>'+depTxt+'</div>'+
+      '<input class="notes" id="n-'+it.id+'" data-id="'+it.id+'" data-f="notes" placeholder="Add a note, contact or next step" value="'+esc(it.notes)+'"></div>'+
+      '<div class="field"><label for="s-'+it.id+'">Status</label><select id="s-'+it.id+'" class="s-'+it.status+'" data-id="'+it.id+'" data-f="status">'+opts+'</select></div>'+
+      '<div class="field"><label for="d-'+it.id+'">Target date</label><input type="date" id="d-'+it.id+'" data-id="'+it.id+'" data-f="due" value="'+esc(it.due)+'">'+(late?'<span class="overdue">Overdue</span>':'')+'</div></div>';
+  }
+  function render(){
+    var all=state.items, done=all.filter(function(i){return i.status==="done";}).length;
+    var bankOpen=all.filter(function(i){return i.group==="bank"&&i.status!=="done";}).length;
+    var blocked=all.filter(function(i){return i.status==="blocked";}).length;
+    var goLive=byId("IT-4");
+    var pct=Math.round(done/all.length*100);
+    root.innerHTML=
+      '<header><span class="eyebrow">Intellexal Solutions · Client deployment</span><h1>Sindh Bank SMS &amp; WhatsApp Deployment</h1>'+
+      '<p class="sub">On-prem WhatsApp Business API and SMS service. Sindh Bank items unblock the iTS workstream, so they are listed first.</p></header>'+
+      '<div class="summary">'+
+        '<div class="stat"><span class="k">Overall progress</span><span class="v">'+done+' / '+all.length+'</span><div class="bar"><i style="width:'+pct+'%"></i></div></div>'+
+        '<div class="stat"><span class="k">Pending from Sindh Bank</span><span class="v">'+bankOpen+'</span></div>'+
+        '<div class="stat"><span class="k">Blocked items</span><span class="v">'+blocked+'</span></div>'+
+        '<div class="stat"><span class="k">Target go-live</span><span class="v" style="font-size:18px">'+(goLive.due?fmt(goLive.due):"Not set")+'</span></div>'+
+      '</div>'+
+      (editing?'<div class="ro">Edit mode. Make your changes, then download the updated file and upload it to your web host in place of the old one.</div>':'')+
+      '<section><div class="sechead"><h2>Required from Sindh Bank</h2><span class="note">Client dependencies</span></div><div class="rows">'+all.filter(function(i){return i.group==="bank";}).map(row).join("")+'</div></section>'+
+      '<section><div class="sechead"><h2>Delivered by iTS</h2><span class="note">Intellexal workstream</span></div><div class="rows">'+all.filter(function(i){return i.group==="its";}).map(row).join("")+'</div></section>'+
+      '<p class="foot">Last updated '+fmt(saved.updated)+'.</p>'+
+      (editing?'<div class="savebar"><span>'+(dirty()?"You have changes that are not in the file yet":"No changes yet")+'</span><div class="acts"><button class="ghost" id="discard">Discard</button><button id="save">Download updated file</button></div></div>':'');
+  }
+  function buildDoc(){
+    var s={updated:today(),items:state.items};
+    var json=JSON.stringify(s,null,1).replace(/</g,"\\u003c");
+    var head=document.head.outerHTML;
+    return '<!doctype html>\n<html lang="en">\n'+head+'\n<body>\n'+
+      '<!-- Tracker data. To update by hand: change "status" (pending, progress, blocked, done), "due" (YYYY-MM-DD) or "notes".\n     Or open this page with #edit at the end of the URL, edit on screen, and click "Download updated file". -->\n'+
+      '<script type="application/json" id="state">'+json+'<\/script>\n<div class="wrap" id="root"></div>\n'+
+      '<script id="app">'+document.getElementById("app").textContent+'<\/script>\n</body>\n</html>\n';
+  }
+  function onChange(e){
+    var el=e.target;if(!el.dataset||!el.dataset.f)return;
+    var it=byId(el.dataset.id);if(!it)return;
+    it[el.dataset.f]=el.value;
+    if(el.dataset.f!=="notes"||e.type==="change")render();
+    else{var bar=root.querySelector(".savebar span");if(bar)bar.textContent="You have changes that are not in the file yet";}
+  }
+  root.addEventListener("change",onChange);
+  root.addEventListener("input",function(e){if(e.target.dataset&&e.target.dataset.f==="notes")onChange(e);});
+  root.addEventListener("click",function(e){
+    if(e.target.id==="discard"){state=JSON.parse(JSON.stringify(saved));render();}
+    if(e.target.id==="save"){
+      var blob=new Blob([buildDoc()],{type:"text/html"});
+      var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="sindh-bank-tracker.html";
+      document.body.appendChild(a);a.click();a.remove();
+    }
+  });
+  window.addEventListener("hashchange",function(){editing=location.hash==="#edit";render();});
+  render();
+})();
+</script>
+</body>
+</html>
